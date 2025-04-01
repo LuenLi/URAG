@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   AppBar,
   Box,
@@ -6,100 +6,69 @@ import {
   Typography,
   Container,
   Grid,
-  Card,
   CardContent,
   CardActions,
-  Button,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
   IconButton,
   Menu,
   MenuItem,
   Chip,
+  Dialog,
+  DialogContent,
+  TextField,
+  Button,
+  Paper,
+  TableContainer,
+  Table,
+  TableHead,
+  TableBody,
+  TableRow,
+  TableCell,
+  InputLabel,
+  FormControl,
+  Select,
+  DialogTitle,
+  DialogActions,
+  Pagination,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
-import EditIcon from '@mui/icons-material/Edit';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import DeleteIcon from '@mui/icons-material/Delete';
+import SearchIcon from '@mui/icons-material/Search';
+import LogoutIcon from '@mui/icons-material/Logout';
+import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
-import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useNavigate, Navigate, useParams } from 'react-router-dom';
 import ProjectSettings from './components/ProjectSettings';
 import CollectionSettings from './components/CollectionSettings';
-
-const theme = createTheme({
-  palette: {
-    primary: {
-      main: '#2196f3',
-      light: '#64b5f6',
-      dark: '#1976d2',
-    },
-    secondary: {
-      main: '#f50057',
-      light: '#ff4081',
-      dark: '#c51162',
-    },
-    background: {
-      default: '#f5f5f5',
-      paper: '#ffffff',
-    },
-  },
-  typography: {
-    fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
-    h4: {
-      fontWeight: 600,
-    },
-    h5: {
-      fontWeight: 600,
-    },
-    h6: {
-      fontWeight: 600,
-    },
-  },
-  components: {
-    MuiButton: {
-      styleOverrides: {
-        root: {
-          textTransform: 'none',
-          borderRadius: 8,
-          padding: '8px 24px',
-          fontWeight: 500,
-        },
-      },
-    },
-    MuiCard: {
-      styleOverrides: {
-        root: {
-          borderRadius: 12,
-          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-          transition: 'transform 0.2s, box-shadow 0.2s',
-          '&:hover': {
-            transform: 'translateY(-4px)',
-            boxShadow: '0 8px 12px rgba(0, 0, 0, 0.15)',
-          },
-        },
-      },
-    },
-    MuiPaper: {
-      styleOverrides: {
-        root: {
-          borderRadius: 12,
-          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-        },
-      },
-    },
-    MuiAppBar: {
-      styleOverrides: {
-        root: {
-          boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-          background: 'linear-gradient(45deg, #2196f3 30%, #1976d2 90%)',
-        },
-      },
-    },
-  },
-});
+import ProjectList from './components/ProjectList';
+import { styled } from '@mui/material/styles';
+import {
+  theme,
+  StyledCard,
+  StyledCardContent,
+  ProjectTitle,
+  ProjectDescription,
+  SearchContainer,
+  StyledTextField,
+  ActionButton,
+  DialogTitleStyled,
+  DialogActionsStyled,
+  StyledDialog,
+  StyledDialogContent,
+  FormContainer,
+  FormField,
+  DeleteDialogContent,
+  DeleteDialogActions,
+  DeleteButton,
+  LoginContainer,
+  LoginPaper,
+  LoginTextField,
+  LoginButton,
+} from './styles/App.styles';
+import PersonIcon from '@mui/icons-material/Person';
+import LockIcon from '@mui/icons-material/Lock';
+import CloseIcon from '@mui/icons-material/Close';
+import UserManagement from './components/UserManagement';
 
 // 模擬專案數據
 const initialProjects = [
@@ -117,176 +86,136 @@ const initialProjects = [
   },
 ];
 
-function ProjectCard({ project, isAddNew, onAddNew, onDelete }) {
+// 模擬用戶數據
+const initialUsers = [
+  {
+    username: 'admin',
+    password: 'admin',
+    role: 'admin'
+  },
+  {
+    username: 'user',
+    password: 'user123',
+    role: 'user'
+  }
+];
+
+// 受保護的路由組件
+function ProtectedRoute({ children, isAuthenticated }) {
+  if (!isAuthenticated) {
+    return <Navigate to="/login" />;
+  }
+  return children;
+}
+
+// 主應用組件
+function MainApp({ projects, onDeleteProject, onAddProject, onLogout, username, userRole, users, onUpdateUsers, setProjects }) {
   const navigate = useNavigate();
-  const [anchorEl, setAnchorEl] = useState(null);
-  const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
+  const { projectId } = useParams();
+  const [collections, setCollections] = useState([]);
 
-  const handleMenuClick = (e) => {
-    setAnchorEl(e.currentTarget);
+  const handleUpdateCollections = (updateFn, projectId) => {
+    // 找到當前項目
+    const currentProject = projects.find(p => p.id === parseInt(projectId));
+    if (!currentProject) return;
+
+    // 更新 collections 狀態
+    setCollections(prevCollections => {
+      const updatedCollections = updateFn(prevCollections);
+      // 更新項目數據
+      const updatedProjects = projects.map(project => {
+        if (project.id === parseInt(projectId)) {
+          return {
+            ...project,
+            collections: updatedCollections
+          };
+        }
+        return project;
+      });
+      setProjects(updatedProjects);
+      return updatedCollections;
+    });
   };
 
-  const handleMenuClose = () => {
-    setAnchorEl(null);
-  };
-
-  const handleDeleteClick = () => {
-    handleMenuClose();
-    setOpenDeleteDialog(true);
-  };
-
-  const handleDeleteConfirm = () => {
-    onDelete(project.id);
-    setOpenDeleteDialog(false);
-  };
+  // 當切換項目時更新 collections
+  useEffect(() => {
+    if (projectId) {
+      const currentProject = projects.find(p => p.id === parseInt(projectId));
+      if (currentProject) {
+        setCollections(currentProject.collections || []);
+      }
+    }
+  }, [projectId, projects]);
 
   return (
-    <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <CardContent sx={{ flexGrow: 1 }}>
-        {isAddNew ? (
-          <Box
-            sx={{
-              height: '100%',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              p: 3,
-              textAlign: 'center',
-              color: 'text.secondary',
-              '&:hover': {
-                color: 'primary.main',
-              },
-            }}
-            onClick={onAddNew}
-          >
-            <AddIcon sx={{ fontSize: 48, mb: 2 }} />
-            <Typography variant="h6">新增專案</Typography>
-          </Box>
-        ) : (
-          <>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-              <Typography variant="h6" component="h2" sx={{ 
-                fontWeight: 600,
-                color: 'primary.main',
-                mb: 1
-              }}>
-                {project.name}
-              </Typography>
-              <IconButton
-                size="small"
-                onClick={handleMenuClick}
-                sx={{ 
-                  color: 'text.secondary',
-                  '&:hover': {
-                    color: 'primary.main'
-                  }
-                }}
-              >
-                <MoreVertIcon />
-              </IconButton>
-            </Box>
-            <Typography 
-              variant="body2" 
-              color="text.secondary"
-              sx={{ 
-                display: '-webkit-box',
-                WebkitLineClamp: 3,
-                WebkitBoxOrient: 'vertical',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                mb: 2
+    <Box sx={{ flexGrow: 1 }}>
+      <AppBar position="static" sx={{ background: 'linear-gradient(45deg, #1976d2, #2196f3)' }}>
+        <Toolbar>
+          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+            URAG
+          </Typography>
+          {userRole === 'admin' && (
+            <Button
+              color="inherit"
+              onClick={() => navigate('/user-management')}
+              sx={{
+                mr: 2,
+                '&:hover': {
+                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                },
               }}
             >
-              {project.description}
+              帳號管理
+            </Button>
+          )}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography variant="body2" sx={{ mr: 2 }}>
+              {username}
             </Typography>
-            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-              <Chip 
-                label={`${project.collections?.length || 0} Collections`}
-                size="small"
-                sx={{ 
-                  bgcolor: 'primary.light',
-                  color: 'white',
-                  '&:hover': {
-                    bgcolor: 'primary.main'
-                  }
-                }}
-              />
-            </Box>
-          </>
+            <IconButton
+              color="inherit"
+              onClick={onLogout}
+              sx={{
+                '&:hover': {
+                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                },
+              }}
+            >
+              <LogoutIcon />
+            </IconButton>
+          </Box>
+        </Toolbar>
+      </AppBar>
+
+      <Routes>
+        <Route path="/" element={<ProjectList projects={projects} onDeleteProject={onDeleteProject} onAddProject={onAddProject} />} />
+        {userRole === 'admin' && (
+          <Route
+            path="/user-management"
+            element={<UserManagement users={users} onUpdateUsers={onUpdateUsers} />}
+          />
         )}
-      </CardContent>
-      {!isAddNew && (
-        <CardActions sx={{ p: 2, pt: 0 }}>
-          <Button 
-            size="small" 
-            onClick={() => navigate(`/project/${project.id}`)}
-            sx={{ 
-              color: 'primary.main',
-              '&:hover': {
-                bgcolor: 'primary.light',
-                color: 'white'
-              }
-            }}
-          >
-            查看詳情
-          </Button>
-        </CardActions>
-      )}
-      <Menu
-        anchorEl={anchorEl}
-        open={Boolean(anchorEl)}
-        onClose={handleMenuClose}
-      >
-        <MenuItem onClick={handleDeleteClick}>
-          <DeleteIcon sx={{ mr: 1 }} /> 刪除
-        </MenuItem>
-      </Menu>
-      <Dialog
-        open={openDeleteDialog}
-        onClose={() => setOpenDeleteDialog(false)}
-      >
-        <DialogTitle>確認刪除</DialogTitle>
-        <DialogContent>
-          <Typography>
-            確定要刪除專案 "{project?.name || '未知專案'}" 嗎？此操作無法復原。
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenDeleteDialog(false)}>取消</Button>
-          <Button onClick={handleDeleteConfirm} color="error" variant="contained">
-            刪除
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </Card>
+        <Route
+          path="/project/:id"
+          element={<ProjectSettings projects={projects} onUpdateProject={onAddProject} />}
+        />
+        <Route
+          path="/project/:projectId/collection/:collectionId"
+          element={<CollectionSettings onUpdateCollections={handleUpdateCollections} />}
+        />
+      </Routes>
+    </Box>
   );
 }
 
-function ProjectList({ projects, onDeleteProject, onAddProject }) {
-  const navigate = useNavigate();
-  const [open, setOpen] = useState(false);
+// 登入組件
+function Login({ onLogin }) {
   const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    department: '',
-    employeeId: '',
+    username: '',
+    password: '',
   });
-
-  const handleOpen = () => {
-    setOpen(true);
-  };
-
-  const handleClose = () => {
-    setOpen(false);
-    setFormData({
-      name: '',
-      description: '',
-      department: '',
-      employeeId: '',
-    });
-  };
+  const [isHovered, setIsHovered] = useState(false);
+  const [error, setError] = useState('');
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -294,164 +223,260 @@ function ProjectList({ projects, onDeleteProject, onAddProject }) {
       ...prev,
       [name]: value
     }));
+    setError('');
   };
 
-  const handleSubmit = () => {
-    onAddProject({
-      id: projects.length + 1,
-      ...formData,
-      collections: []
-    });
-    handleClose();
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (formData.username && formData.password) {
+      onLogin(formData.username, formData.password);
+      setError('帳號或密碼錯誤');
+    }
   };
 
   return (
-    <>
-      <Container sx={{ py: 4 }} maxWidth="lg">
-        <Grid container spacing={4}>
-          <Grid item xs={12} sm={6} md={4}>
-            <ProjectCard isAddNew onAddNew={handleOpen} />
-          </Grid>
-          {projects.map((project) => (
-            <Grid item xs={12} sm={6} md={4} key={project.id}>
-              <ProjectCard project={project} onDelete={onDeleteProject} />
-            </Grid>
-          ))}
-        </Grid>
-      </Container>
-
-      <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ 
-          pb: 1,
-          color: 'primary.main',
-          fontWeight: 600
-        }}>
-          新增專案
-        </DialogTitle>
-        <DialogContent>
-          <Box component="form" sx={{ mt: 2 }}>
-            <Grid container spacing={2}>
-              <Grid item xs={12}>
-                <TextField
-                  required
-                  fullWidth
-                  label="專案名稱"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleChange}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      '&:hover fieldset': {
-                        borderColor: 'primary.main',
-                      },
-                    },
-                  }}
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  required
-                  fullWidth
-                  label="部門"
-                  name="department"
-                  value={formData.department}
-                  onChange={handleChange}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      '&:hover fieldset': {
-                        borderColor: 'primary.main',
-                      },
-                    },
-                  }}
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  required
-                  fullWidth
-                  label="工號"
-                  name="employeeId"
-                  value={formData.employeeId}
-                  onChange={handleChange}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      '&:hover fieldset': {
-                        borderColor: 'primary.main',
-                      },
-                    },
-                  }}
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <TextField
-                  required
-                  fullWidth
-                  label="專案簡介"
-                  name="description"
-                  multiline
-                  rows={4}
-                  value={formData.description}
-                  onChange={handleChange}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      '&:hover fieldset': {
-                        borderColor: 'primary.main',
-                      },
-                    },
-                  }}
-                />
-              </Grid>
-            </Grid>
-          </Box>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 3 }}>
-          <Button 
-            onClick={handleClose}
+    <LoginContainer>
+      <Box
+        sx={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          gap: 2,
+          zIndex: 1,
+        }}
+      >
+        {[...Array(5)].map((_, index) => (
+          <Box
+            key={index}
             sx={{
-              textTransform: 'none',
-              fontWeight: 500,
-              borderRadius: 2
+              width: 100,
+              height: 100,
+              borderRadius: '50%',
+              background: `linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05))`,
+              animation: `float ${3 + index}s infinite ease-in-out`,
+              animationDelay: `${index * 0.5}s`,
+              position: 'absolute',
+              top: `${20 + index * 15}%`,
+              left: `${20 + index * 15}%`,
+              backdropFilter: 'blur(5px)',
             }}
-          >
-            取消
-          </Button>
-          <Button 
-            onClick={handleSubmit}
-            variant="contained"
-            color="primary"
+          />
+        ))}
+      </Box>
+      <LoginPaper elevation={3}>
+        <Box 
+          sx={{ 
+            mb: 4, 
+            display: 'flex', 
+            flexDirection: 'column', 
+            alignItems: 'center',
+            animation: 'fadeIn 0.5s ease-in-out',
+          }}
+        >
+          <Box
             sx={{
-              textTransform: 'none',
-              fontWeight: 500,
-              borderRadius: 2,
-              boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-              '&:hover': {
-                boxShadow: '0 4px 8px rgba(0, 0, 0, 0.2)',
+              width: 90,
+              height: 90,
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg, #1976d2 0%, #2196f3 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              mb: 3,
+              boxShadow: '0 4px 20px rgba(33, 150, 243, 0.3)',
+              position: 'relative',
+              transform: isHovered ? 'scale(1.1)' : 'scale(1)',
+              transition: 'transform 0.3s ease-in-out',
+              '&::before': {
+                content: '""',
+                position: 'absolute',
+                top: -2,
+                left: -2,
+                right: -2,
+                bottom: -2,
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, rgba(255,255,255,0.2), rgba(255,255,255,0))',
+                zIndex: -1,
+                animation: 'pulse 2s infinite',
+              },
+            }}
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+          >
+            <LockOutlinedIcon 
+              sx={{ 
+                fontSize: 44, 
+                color: 'white',
+                transform: isHovered ? 'rotate(360deg)' : 'rotate(0deg)',
+                transition: 'transform 0.5s ease-in-out',
+              }} 
+            />
+          </Box>
+          <Typography 
+            variant="h4" 
+            component="h1" 
+            gutterBottom
+            sx={{ 
+              fontWeight: 700,
+              background: 'linear-gradient(45deg, #1976d2, #2196f3)',
+              backgroundClip: 'text',
+              textFillColor: 'transparent',
+              textAlign: 'center',
+              mb: 2,
+              position: 'relative',
+              '&::after': {
+                content: '""',
+                position: 'absolute',
+                bottom: -8,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                width: '60%',
+                height: 3,
+                background: 'linear-gradient(90deg, transparent, #2196f3, transparent)',
+                borderRadius: 2,
               },
             }}
           >
-            新增
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </>
+            歡迎使用 URAG
+          </Typography>
+          <Typography 
+            variant="body1" 
+            color="text.secondary"
+            sx={{ 
+              textAlign: 'center',
+              maxWidth: '80%',
+              lineHeight: 1.6,
+              fontWeight: 500,
+            }}
+          >
+            請輸入您的帳號密碼以繼續使用系統
+          </Typography>
+        </Box>
+        <Box 
+          component="form" 
+          onSubmit={handleSubmit} 
+          sx={{ 
+            width: '100%',
+            animation: 'slideUp 0.5s ease-in-out',
+          }}
+        >
+          {error && (
+            <Typography 
+              color="error" 
+              sx={{ 
+                mb: 2, 
+                textAlign: 'center',
+                animation: 'fadeIn 0.3s ease-in-out',
+              }}
+            >
+              {error}
+            </Typography>
+          )}
+          <LoginTextField
+            required
+            fullWidth
+            label="使用者名稱"
+            name="username"
+            value={formData.username}
+            onChange={handleChange}
+            placeholder="請輸入使用者名稱"
+            autoFocus
+            error={!!error}
+            InputProps={{
+              startAdornment: (
+                <Box 
+                  sx={{ 
+                    mr: 1, 
+                    color: 'text.secondary',
+                    transform: formData.username ? 'scale(1.1)' : 'scale(1)',
+                    transition: 'transform 0.3s ease-in-out',
+                  }}
+                >
+                  <PersonIcon />
+                </Box>
+              ),
+            }}
+          />
+          <LoginTextField
+            required
+            fullWidth
+            label="密碼"
+            name="password"
+            type="password"
+            value={formData.password}
+            onChange={handleChange}
+            placeholder="請輸入密碼"
+            error={!!error}
+            InputProps={{
+              startAdornment: (
+                <Box 
+                  sx={{ 
+                    mr: 1, 
+                    color: 'text.secondary',
+                    transform: formData.password ? 'scale(1.1)' : 'scale(1)',
+                    transition: 'transform 0.3s ease-in-out',
+                  }}
+                >
+                  <LockIcon />
+                </Box>
+              ),
+            }}
+          />
+          <LoginButton
+            type="submit"
+            variant="contained"
+            color="primary"
+            fullWidth
+            sx={{ 
+              mt: 3,
+              position: 'relative',
+              overflow: 'hidden',
+              '&::before': {
+                content: '""',
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '100%',
+                background: 'linear-gradient(45deg, rgba(255,255,255,0.1), rgba(255,255,255,0))',
+                transform: 'translateX(-100%)',
+                transition: 'transform 0.3s ease-in-out',
+              },
+              '&:hover::before': {
+                transform: 'translateX(100%)',
+              },
+            }}
+          >
+            登入系統
+          </LoginButton>
+        </Box>
+      </LoginPaper>
+    </LoginContainer>
   );
 }
 
 function App() {
   const [projects, setProjects] = useState(initialProjects);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [username, setUsername] = useState('');
+  const [userRole, setUserRole] = useState('');
+  const [users, setUsers] = useState(initialUsers);
 
   const handleUpdateProject = (updatedProject) => {
     setProjects(prevProjects => {
       const existingProject = prevProjects.find(p => p.id === updatedProject.id);
       if (existingProject) {
-        // 更新現有專案
         return prevProjects.map(project =>
           project.id === updatedProject.id
             ? updatedProject
             : project
         );
       } else {
-        // 新增專案
         return [...prevProjects, updatedProject];
       }
     });
@@ -461,44 +486,54 @@ function App() {
     setProjects(prevProjects => prevProjects.filter(project => project.id !== projectId));
   };
 
-  return (
-    <ThemeProvider theme={theme}>
-      <Router>
-        <Box sx={{ flexGrow: 1 }}>
-          <AppBar position="static">
-            <Toolbar>
-              <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-                URAG
-              </Typography>
-            </Toolbar>
-          </AppBar>
+  const handleLogin = (username, password) => {
+    const user = users.find(u => u.username === username && u.password === password);
+    if (user) {
+      setIsAuthenticated(true);
+      setUsername(username);
+      setUserRole(user.role);
+    }
+  };
 
-          <Routes>
-            <Route
-              path="/"
-              element={
-                <ProjectList
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    setUsername('');
+    setUserRole('');
+  };
+
+  return (
+    <ThemeProvider theme={createTheme(theme)}>
+      <Router>
+        <Routes>
+          <Route
+            path="/login"
+            element={
+              isAuthenticated ? (
+                <Navigate to="/" />
+              ) : (
+                <Login onLogin={handleLogin} />
+              )
+            }
+          />
+          <Route
+            path="/*"
+            element={
+              <ProtectedRoute isAuthenticated={isAuthenticated}>
+                <MainApp
                   projects={projects}
                   onDeleteProject={handleDeleteProject}
                   onAddProject={handleUpdateProject}
+                  onLogout={handleLogout}
+                  username={username}
+                  userRole={userRole}
+                  users={users}
+                  onUpdateUsers={setUsers}
+                  setProjects={setProjects}
                 />
-              }
-            />
-            <Route
-              path="/project/:id"
-              element={
-                <ProjectSettings
-                  projects={projects}
-                  onUpdateProject={handleUpdateProject}
-                />
-              }
-            />
-            <Route
-              path="/project/:projectId/collection/:collectionId"
-              element={<CollectionSettings />}
-            />
-          </Routes>
-        </Box>
+              </ProtectedRoute>
+            }
+          />
+        </Routes>
       </Router>
     </ThemeProvider>
   );

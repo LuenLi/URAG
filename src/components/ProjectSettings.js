@@ -56,7 +56,7 @@ function ProjectSettings({ projects, onUpdateProject }) {
     department: '',
     employeeId: '',
   });
-  const [collections, setCollections] = useState(mockCollections);
+  const [collections, setCollections] = useState([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [collectionToDelete, setCollectionToDelete] = useState(null);
 
@@ -70,6 +70,8 @@ function ProjectSettings({ projects, onUpdateProject }) {
           department: project.department || '',
           employeeId: project.employeeId || '',
         });
+        // 設置初始 collections
+        setCollections(project.collections || []);
       }
     }
   }, [id, projects]);
@@ -117,6 +119,17 @@ function ProjectSettings({ projects, onUpdateProject }) {
   const handleDeleteCancel = () => {
     setDeleteDialogOpen(false);
     setCollectionToDelete(null);
+  };
+
+  // 更新 collections 的函數
+  const handleUpdateCollections = (newCollections) => {
+    setCollections(newCollections);
+    // 更新專案數據
+    const updatedProject = {
+      ...projects.find(p => p.id === parseInt(id)),
+      collections: newCollections
+    };
+    onUpdateProject(updatedProject);
   };
 
   return (
@@ -373,7 +386,7 @@ function ProjectSettings({ projects, onUpdateProject }) {
                       <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
                         <IconButton
                           size="small"
-                          onClick={() => handleEditCollection(collection.id)}
+                          onClick={() => navigate(`/project/${id}/collection/${collection.id}`)}
                           sx={{ 
                             color: 'primary.main',
                             '&:hover': {
